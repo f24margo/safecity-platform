@@ -1,0 +1,5 @@
+{
+  "$schema": "https://dev.wix.com/wix-cli/schemas/wix-config.json",
+  "appId": "bcc16cb5-f153-4e29-b575-05b4a7ddd60b",
+  "projectId": "security-manager-crm"
+}
