@@ -1,0 +1,5 @@
+{
+  "$schema": "https://dev.wix.com/wix-cli/schemas/dashboard-page.json",
+  "id": "723e7225-6010-4338-903e-5b613ad9dd68",
+  "title": "Settings"
+}
