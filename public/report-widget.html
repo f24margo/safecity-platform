@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: #0f172a; 
+            overflow: hidden; 
+            height: 100vh;
+        }
+        .map-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .btn-report {
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: white; border: none; border-radius: 50px;
+            padding: 22px 40px; font-size: 18px; font-weight: 800;
+            cursor: pointer; width: 100%; max-width: 320px; margin: 0 auto;
+            box-shadow: 0 10px 40px rgba(239,68,68,0.4);
+            animation: pulse 2.5s infinite;
+            text-transform: uppercase;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(239,68,68,0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 50px rgba(239,68,68,0.6); }
+        }
+    </style>
+</head>
+<body>
+<div class="map-container">
+    <h1 style="color: white; text-align: center; padding: 40px;">🛡️ БЕЗПЕЧНА ГРОМАДА</h1>
+    <button class="btn-report"
+
+
+mkdir -p public
+
+cat > public/report-widget.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background: #0f172a; 
+            overflow: hidden; 
+            height: 100vh;
+        }
+        .map-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .btn-report {
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: white; border: none; border-radius: 50px;
+            padding: 22px 40px; font-size: 18px; font-weight: 800;
+            cursor: pointer; width: 100%; max-width: 320px; margin: 0 auto;
+            box-shadow: 0 10px 40px rgba(239,68,68,0.4);
+            animation: pulse 2.5s infinite;
+            text-transform: uppercase;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(239,68,68,0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 50px rgba(239,68,68,0.6); }
+        }
+    </style>
+</head>
+<body>
+<div class="map-container">
+    <h1 style="color: white; text-align: center; padding: 40px;">🛡️ БЕЗПЕЧНА ГРОМАДА</h1>
+    <button class="btn-report" onclick="openForm()">🚨 ПОВІДОМИТИ</button>
+</div>
+<script>
+    function openForm() {
+        window.parent.postMessage({
+            type: 'SUBMIT_REPORT',
+            data: {
+                title: 'Test Event',
+                lat: 46.4825,
+                lng: 30.7233,
+                address: 'Одеса',
+                zone: 'Південне'
+            }
+        }, '*');
+    }
+</script>
+</body>
+</html>
