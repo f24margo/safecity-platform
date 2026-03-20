@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+        
+        /* Карта на весь екран */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+        
+        /* Overlay поверх карти */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 2;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        /* Gradient зверху і знизу */
+        .overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(to bottom, rgba(15,23,42,0.9), transparent);
+            z-index: -1;
+        }
+        
+        .overlay::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(to top, rgba(15,23,42,0.9), transparent);
+            z-index: -1;
+        }
+        
+        /* Заголовок */
+        .header {
+            text-align: center;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.8;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Кнопка ПОВІДОМИТИ */
+        .btn-report {
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(239,68,68,0.5);
+            animation: pulse 2.5s infinite;
+            pointer-events: all;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1); 
+                box-shadow: 0 10px 40px rgba(239,68,68,0.5);
+            }
+            50% { 
+                transform: scale(1.05); 
+                box-shadow: 0 15px 50px rgba(239,68,68,0.7);
+            }
+        }
+        
+        .btn-report:hover {
+            transform: scale(1.08);
+            box-shadow: 0 15px 50px rgba(239,68,68,0.8);
+        }
+        
+        /* Статистика */
+        .stats {
+            display: flex;
+            gap: 30px;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat .value {
+            font-size: 32px;
+            font-weight: 800;
+            color: #FCD34D;
+            line-height: 1;
+        }
+        
+        .stat .label {
+            font-size: 11px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-top: 4px;
+        }
+        
+        /* Custom маркери */
+        .marker-icon {
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            border: 3px solid white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .marker-green { background: #10B981; }
+        .marker-yellow { background: #F59E0B; }
+        .marker-red { background: #EF4444; }
+        
+        /* Popup стилі */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .popup-content {
+            padding: 8px;
+        }
+        
+        .popup-content h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        
+        .popup-content p {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #64748B;
+        }
+    </style>
+</head>
+<body>
+    <!-- Карта -->
+    <div id="map"></div>
+    
+    <!-- Overlay з контентом -->
+    <div class="overlay">
+        <!-- Заголовок -->
+        <div class="header">
+            <h1>🛡️ БЕЗПЕЧНА ГРОМАДА</h1>
+            <p>Одеська область • Цифровий моніторинг</p>
+        </div>
+        
+        <!-- Кнопка -->
+        <button class="btn-report" onclick="openReportForm()">
+            🚨 ПОВІДОМИТИ
+        </button>
+        
+        <!-- Статистика -->
+        <div class="stats">
+            <div class="stat">
+                <div class="value" id="statCommunities">3</div>
+                <div class="label">Громади</div>
+            </div>
+            <div class="stat">
+                <div class="value" id="statIncidents">128</div>
+                <div class="label">Звернень</div>
+            </div>
+            <div class="stat">
+                <div class="value">24/7</div>
+                <div class="label">Захист</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Ініціалізація карти (центр — Одеса)
+        const map = L.map('map', {
+            center: [46.4825, 30.7233],
+            zoom: 11,
+            zoomControl: true
+        });
+        
+        // OpenStreetMap tiles (безкоштовно, без API ключа!)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 18
+        }).addTo(map);
+        
+        // Масив подій (отримуємо з Velo)
+        let incidents = [];
+        
+        // Слухаємо повідомлення від Velo
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'LOAD_INCIDENTS') {
+                incidents = event.data.data;
+                loadIncidentsOnMap(incidents);
+            }
+        });
+        
+        // Завантажуємо маркери на карту
+        function loadIncidentsOnMap(data) {
+            // Очищаємо старі маркери
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Додаємо нові маркери
+            data.forEach(inc => {
+                const color = getMarkerColor(inc.riskLevel);
+                
+                const icon = L.divIcon({
+                    className: 'marker-icon',
+                    html: `<div class="marker-icon marker-${color}"></div>`,
+                    iconSize: [16, 16]
+                });
+                
+                const marker = L.marker([inc.latitude, inc.longitude], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div class="popup-content">
+                            <h3>${inc.code || 'TEMP'} — ${inc.title}</h3>
+                            <p>📍 ${inc.zone}</p>
+                            <p>⚠️ Ризик: ${inc.riskLevel}/5</p>
+                            <p>📅 ${new Date(inc.createdDate).toLocaleDateString('uk-UA')}</p>
+                            ${inc.status === 'resolved' ? '<p style="color: #10B981;">✅ Вирішено</p>' : ''}
+                        </div>
+                    `);
+            });
+            
+            // Оновлюємо статистику
+            document.getElementById('statIncidents').textContent = data.length;
+        }
+        
+        function getMarkerColor(riskLevel) {
+            if (riskLevel >= 4) return 'red';    // Критичний
+            if (riskLevel >= 3) return 'yellow'; // Середній
+            return 'green';                       // Низький
+        }
+        
+        function openReportForm() {
+            // Відправляємо повідомлення в Velo
+            window.parent.postMessage({
+                type: 'OPEN_REPORT_FORM'
+            }, '*');
+        }
+        
+        // Запитуємо події при завантаженні
+        window.parent.postMessage({
+            type: 'GET_INCIDENTS'
+        }, '*');
+    </script>
+</body>
+</html>
