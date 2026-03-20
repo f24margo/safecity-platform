@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            padding: 20px;
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        h2 { color: #1e293b; margin-bottom: 8px; }
+        .plan-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .plan-free { background: #e0e7ff; color: #4338ca; }
+        .plan-premium { background: #fef3c7; color: #92400e; }
+        
+        .photo-preview { 
+            width: 100%; 
+            max-height: 300px; 
+            object-fit: cover;
+            border-radius: 12px; 
+            margin: 15px 0; 
+        }
+        .size-info { 
+            color: #64748b; 
+            font-size: 13px; 
+            margin-top: 8px;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .compression-good { color: #10B981; font-weight: 600; }
+        
+        .btn-upload {
+            background: #3B82F6; 
+            color: white; 
+            border: none;
+            padding: 14px 24px; 
+            border-radius: 10px;
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+        .btn-upload:hover { background: #2563eb; }
+        .btn-upload:active { transform: scale(0.98); }
+        
+        .btn-submit {
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: white; 
+            border: none;
+            padding: 18px; 
+            border-radius: 12px; 
+            width: 100%;
+            font-size: 16px; 
+            font-weight: 700; 
+            margin-top: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-submit:active { transform: scale(0.98); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        textarea {
+            width: 100%; 
+            padding: 15px; 
+            border: 2px solid #e2e8f0;
+            border-radius: 12px; 
+            font-size: 16px;
+            font-family: inherit;
+            min-height: 120px;
+            margin-top: 15px;
+            resize: vertical;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3B82F6;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📸 Нове звернення</h2>
+        <div id="planBadge" class="plan-badge plan-free">Free план (макс. 1 MB)</div>
+        
+        <label class="btn-upload">
+            📷 Вибрати фото
+            <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+        </label>
+        
+        <div id="previewContainer" style="display:none;">
+            <img id="preview" class="photo-preview" alt="Превью">
+            <div class="size-info">
+                📊 <span id="originalSize"></span> → <span id="compressedSize"></span>
+                <span id="compressionRatio" class="compression-good"></span>
+            </div>
+        </div>
+        
+        <textarea id="description" placeholder="Опишіть проблему: що, де, коли сталося..." maxlength="500"></textarea>
+        <div style="text-align: right; color: #94a3b8; font-size: 12px; margin-top: 4px;">
+            <span id="charCount">0</span>/500
+        </div>
+        
+        <button class="btn-submit" id="submitBtn" onclick="submitReport()">
+            🚨 НАДІСЛАТИ ЗВЕРНЕННЯ
+        </button>
+    </div>
+
+<script>
+let compressedPhoto = null;
+let maxSizeKB = 1024; // Default: 1 MB для Free
+let isPremium = false;
+
+// Получаем план пользователя от Velo
+window.addEventListener('message', (event) => {
+    if (event.data.type === 'USER_PLAN') {
+        isPremium = event.data.isPremium;
+        maxSizeKB = isPremium ? 5120 : 1024; // 5 MB для Premium
+        
+        const badge = document.getElementById('planBadge');
+        if (isPremium) {
+            badge.textContent = '⭐ Premium план (макс. 5 MB)';
+            badge.className = 'plan-badge plan-premium';
+        }
+        console.log('📋 План:', isPremium ? 'Premium (5MB)' : 'Free (1MB)');
+    }
+});
+
+// Счетчик символов
+document.getElementById('description').addEventListener('input', (e) => {
+    document.getElementById('charCount').textContent = e.target.value.length;
+});
+
+// Обработка выбора фото
+document.getElementById('photoInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const originalSizeKB = (file.size / 1024).toFixed(0);
+    document.getElementById('originalSize').textContent = `Оригінал: ${originalSizeKB} KB`;
+    
+    // Показываем индикатор загрузки
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.innerHTML = '<span class="loading"></span> Стискаємо фото...';
+    submitBtn.disabled = true;
+    
+    try {
+        // Сжимаем фото
+        compressedPhoto = await compressImage(file, maxSizeKB);
+        
+        const compressedSizeKB = (compressedPhoto.length * 0.75 / 1024).toFixed(0);
+        document.getElementById('compressedSize').textContent = `Стиснуто: ${compressedSizeKB} KB`;
+        
+        const ratio = ((1 - compressedSizeKB / originalSizeKB) * 100).toFixed(0);
+        document.getElementById('compressionRatio').textContent = `(−${ratio}% 🎉)`;
+        
+        // Показываем превью
+        document.getElementById('preview').src = compressedPhoto;
+        document.getElementById('previewContainer').style.display = 'block';
+        
+    } catch (err) {
+        console.error('Помилка стиснення:', err);
+        alert('❌ Помилка обробки фото. Спробуйте інше зображення.');
+    } finally {
+        submitBtn.innerHTML = '🚨 НАДІСЛАТИ ЗВЕРНЕННЯ';
+        submitBtn.disabled = false;
+    }
+});
+
+// Функция сжатия фото
+async function compressImage(file, maxSizeKB) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Помилка читання файлу'));
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Помилка завантаження зображення'));
+            img.onload = () => {
+                try {
+                    // Бинарный поиск оптимального качества
+                    let minQ = 0.1, maxQ = 0.9;
+                    let result = null;
+                    
+                    for (let i = 0; i < 10; i++) {
+                        const quality = (minQ + maxQ) / 2;
+                        result = compressWithQuality(img, quality);
+                        const sizeKB = result.length * 0.75 / 1024;
+                        
+                        if (sizeKB > maxSizeKB) {
+                            maxQ = quality;
+                        } else {
+                            minQ = quality;
+                        }
+                    }
+                    
+                    resolve(result);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function compressWithQuality(img, quality) {
+    const canvas = document.createElement('canvas');
+    let width = img.width;
+    let height = img.height;
+    
+    // Resize если слишком большое (макс 2048px)
+    const maxDimension = 2048;
+    if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+            height = (height / width) * maxDimension;
+            width = maxDimension;
+        } else {
+            width = (width / height) * maxDimension;
+            height = maxDimension;
+        }
+    }
+    
+    canvas.width = width;
+    canvas.height = height;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+    
+    return canvas.toDataURL('image/jpeg', quality);
+}
+
+async function submitReport() {
+    const description = document.getElementById('description').value.trim();
+    
+    if (!description) {
+        alert('⚠️ Будь ласка, опишіть проблему');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.innerHTML = '<span class="loading"></span> Надсилаємо...';
+    submitBtn.disabled = true;
+    
+    try {
+        // Получаем GPS
+        let lat = 0, lng = 0, address = 'GPS недоступний';
+        
+        try {
+            const pos = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, { 
+                    timeout: 5000,
+                    enableHighAccuracy: true 
+                });
+            });
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+            address = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        } catch (err) {
+            console.warn('GPS помилка:', err.message);
+        }
+        
+        // Отправляем в Velo
+        window.parent.postMessage({
+            type: 'SUBMIT_REPORT',
+            data: {
+                title: description,
+                lat: lat,
+                lng: lng,
+                address: address,
+                photo: compressedPhoto
+            }
+        }, '*');
+        
+        // Успех!
+        alert('✅ Звернення надіслано! Дякуємо за допомогу громаді.');
+        
+        // Очищаем форму
+        document.getElementById('description').value = '';
+        document.getElementById('charCount').textContent = '0';
+        document.getElementById('previewContainer').style.display = 'none';
+        document.getElementById('photoInput').value = '';
+        compressedPhoto = null;
+        
+    } catch (err) {
+        console.error('Помилка відправки:', err);
+        alert('❌ Помилка відправки. Спробуйте ще раз.');
+    } finally {
+        submitBtn.innerHTML = '🚨 НАДІСЛАТИ ЗВЕРНЕННЯ';
+        submitBtn.disabled = false;
+    }
+}
+
+// Запрашиваем план при загрузке
+window.parent.postMessage({ type: 'GET_USER_PLAN' }, '*');
+</script>
+</body>
+</html>
