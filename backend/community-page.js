@@ -1,10 +1,10 @@
-// Velo код для сторінки /zvrennennya (Моя громада)
+// Velo код для сторінки /zvrennennya
 // Підключає Leaflet карту та обробляє звернення
+// ВАЖЛИВО: Громада визначається автоматично з member.customFields.community
 
 import wixData from 'wix-data';
 import wixMembersFrontend from 'wix-members-frontend';
 import wixLocation from 'wix-location';
-import { mediaManager } from 'wix-media-backend';
 
 let currentMember = null;
 let userCommunity = '';
@@ -25,10 +25,18 @@ $w.onReady(async function () {
     
     if (!userCommunity) {
         // Показуємо повідомлення про необхідність вибрати громаду
-        $w('#errorMessage').text = 'Будь ласка, оберіть вашу громаду в профілі';
-        $w('#errorMessage').show();
+        console.error('❌ У користувача не вказана громада в профілі');
+        // TODO: Показати UI повідомлення
         return;
     }
+    
+    console.log('✅ Користувач:', currentMember.loginEmail, '| Громада:', userCommunity);
+    
+    // Відправляємо громаду на карту
+    $w('#mapWidget').postMessage({
+        type: 'SET_USER_COMMUNITY',
+        community: userCommunity
+    });
     
     // Завантажуємо події громади
     await loadCommunityIncidents();
@@ -40,9 +48,17 @@ $w.onReady(async function () {
             await loadCommunityIncidents();
         }
         
-        if (event.data.type === 'OPEN_REPORT_FORM') {
-            // Відкриваємо форму звернення
-            openReportForm();
+        if (event.data.type === 'GET_USER_COMMUNITY') {
+            // Карта запитує громаду користувача
+            $w('#mapWidget').postMessage({
+                type: 'SET_USER_COMMUNITY',
+                community: userCommunity
+            });
+        }
+        
+        if (event.data.type === 'SUBMIT_REPORT') {
+            // Обробка нового звернення
+            await handleNewReport(event.data.data);
         }
     });
 });
@@ -69,35 +85,9 @@ async function loadCommunityIncidents() {
     }
 }
 
-// Відкриваємо форму звернення
-function openReportForm() {
-    // Показуємо lightbox з формою
-    $w('#reportLightbox').show();
-    
-    // Або перенаправляємо на окрему сторінку
-    // wixLocation.to('/report');
-}
-
-// Обробка нового звернення (якщо форма на цій же сторінці)
-export async function submitIncident(data) {
+// Обробка нового звернення
+async function handleNewReport(data) {
     try {
-        // Завантажуємо фото (якщо є)
-        let photoUrl = null;
-        
-        if (data.photo) {
-            const base64Data = data.photo.split(',')[1];
-            const blob = base64ToBlob(base64Data, 'image/jpeg');
-            
-            const fileName = `${currentMember._id}_${Date.now()}.jpg`;
-            const uploadResult = await mediaManager.upload(
-                `incidents/${userCommunity}`,
-                blob,
-                fileName
-            );
-            
-            photoUrl = uploadResult.fileUrl;
-        }
-        
         // Створюємо звернення
         const incident = {
             title: data.title,
@@ -105,51 +95,32 @@ export async function submitIncident(data) {
             category: 'Не класифіковано',
             riskLevel: 2, // За замовчуванням
             status: 'pending',
-            zone: userCommunity, // ← Автоматично з профілю!
+            zone: userCommunity, // ← АВТОМАТИЧНО з профілю!
             latitude: data.lat || 0,
             longitude: data.lng || 0,
             address: data.address || 'Локацію не визначено',
-            photo: photoUrl,
-            photoSize: data.photo ? getFileSizeKB(data.photo) + ' KB' : null,
+            photo: null, // TODO: Додати фото пізніше
             reportedBy: currentMember.loginEmail,
-            authorName: `${currentMember.name} ${currentMember.lastName || ''}`.trim(),
+            authorName: `${currentMember.name || ''} ${currentMember.lastName || ''}`.trim() || 'Анонім',
             memberId: currentMember._id,
             createdDate: new Date(),
             source: 'map_button'
         };
         
-        await wixData.insert("Incidents", incident);
+        const saved = await wixData.insert("Incidents", incident);
         
-        console.log('✅ Звернення створено');
+        console.log('✅ Звернення створено:', saved._id);
         
         // Оновлюємо карту
         await loadCommunityIncidents();
         
-        // Закриваємо форму
-        $w('#reportLightbox').hide();
+        // TODO: Відправити в Telegram (опціонально)
+        // await sendToTelegram(saved);
         
-        // Показуємо успіх
-        $w('#successMessage').show();
-        setTimeout(() => $w('#successMessage').hide(), 3000);
-        
-        return true;
+        return saved;
         
     } catch (err) {
         console.error('❌ Помилка створення звернення:', err);
-        return false;
+        return null;
     }
-}
-
-// Утиліти
-function base64ToBlob(base64, mimeType) {
-    const byteCharacters = atob(base64);
-    const byteArrays = [];
-    for (let i = 0; i < byteCharacters.length; i++) {
-        byteArrays.push(byteCharacters.charCodeAt(i));
-    }
-    return new Blob([new Uint8Array(byteArrays)], { type: mimeType });
-}
-
-function getFileSizeKB(base64String) {
-    return (base64String.length * 0.75 / 1024).toFixed(0);
 }
