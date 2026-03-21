@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        /* LEAFLET КАРТА */
+        #map {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+        
+        /* OVERLAY */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100vh;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 40px 20px 30px;
+            background: linear-gradient(to bottom, rgba(15,23,42,0.85) 0%, transparent 40%, transparent 60%, rgba(15,23,42,0.9) 100%);
+            color: white;
+            text-align: center;
+            pointer-events: none;
+        }
+        
+        .overlay > * { pointer-events: all; }
+        
+        .top-block h1 { 
+            font-size: 26px; 
+            font-weight: 800; 
+            margin-bottom: 5px; 
+            text-shadow: 0 2px 10px rgba(0,0,0,0.7); 
+        }
+        
+        .top-block p { 
+            font-size: 14px; 
+            opacity: 0.9; 
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        /* КНОПКА */
+        .btn-report {
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: white; 
+            border: none; 
+            border-radius: 50px;
+            padding: 22px 40px; 
+            font-size: 18px; 
+            font-weight: 800;
+            cursor: pointer; 
+            width: 100%; 
+            max-width: 320px; 
+            margin: 0 auto;
+            box-shadow: 0 10px 40px rgba(239,68,68,0.6);
+            animation: pulse 2.5s infinite;
+            text-transform: uppercase;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1); 
+                box-shadow: 0 10px 40px rgba(239,68,68,0.6);
+            }
+            50% { 
+                transform: scale(1.05); 
+                box-shadow: 0 15px 50px rgba(239,68,68,0.8);
+            }
+        }
+        
+        /* СТАТИСТИКА */
+        .stats { 
+            display: flex; 
+            gap: 25px; 
+            justify-content: center; 
+        }
+        
+        .stat .value { 
+            font-size: 28px; 
+            font-weight: 800; 
+            color: #FCD34D;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        .stat .label { 
+            font-size: 10px; 
+            opacity: 0.7; 
+            text-transform: uppercase; 
+            letter-spacing: 1.2px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        /* МОДАЛЬНА ФОРМА */
+        .form-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(15,23,42,0.95);
+            backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .form-overlay.open { display: flex; }
+        
+        .form-card {
+            background: white;
+            border-radius: 28px;
+            width: 92%;
+            max-width: 400px;
+            color: #1e293b;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+            overflow: hidden;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .form-header {
+            background: #EF4444;
+            padding: 20px 24px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .form-header h2 { font-size: 18px; font-weight: 700; }
+        
+        .close-btn {
+            background: rgba(0,0,0,0.15);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .form-content { padding: 24px; text-align: center; }
+        
+        .step { display: none; }
+        .step.active { display: block; }
+        
+        .btn-action {
+            width: 100%;
+            background: #EF4444;
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+        
+        textarea {
+            width: 100%;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 15px;
+            font-size: 16px;
+            min-height: 120px;
+            outline: none;
+            font-family: inherit;
+        }
+        
+        textarea:focus {
+            border-color: #EF4444;
+            background: #fffafb;
+        }
+        
+        .location-badge {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            border: 1px solid #dcfce7;
+            font-weight: 600;
+        }
+        
+        .community-badge {
+            background: #EFF6FF;
+            color: #1E40AF;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            border: 1px solid #DBEAFE;
+            font-weight: 600;
+        }
+        
+        .progress-dots {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            transition: 0.3s;
+        }
+        
+        .dot.active {
+            background: #EF4444;
+            width: 24px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- LEAFLET КАРТА -->
+<div id="map"></div>
+
+<!-- OVERLAY -->
+<div class="overlay">
+    <div class="top-block">
+        <h1>🛡️ БЕЗПЕЧНА ГРОМАДА</h1>
+        <p id="communityName">Завантаження...</p>
+    </div>
+
+    <button class="btn-report" onclick="openForm()">🚨 ПОВІДОМИТИ</button>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="value">3</div>
+            <div class="label">Громади</div>
+        </div>
+        <div class="stat">
+            <div class="value" id="totalCount">0</div>
+            <div class="label">Звернень</div>
+        </div>
+        <div class="stat">
+            <div class="value">24/7</div>
+            <div class="label">Захист</div>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНА ФОРМА (ТІЛЬКИ 2 КРОКИ!) -->
+<div class="form-overlay" id="formOverlay">
+    <div class="form-card">
+        <div class="form-header">
+            <h2>Нове звернення</h2>
+            <button class="close-btn" onclick="closeForm()">✕</button>
+        </div>
+        
+        <div class="form-content">
+            <div class="progress-dots" id="dots">
+                <div class="dot active"></div>
+                <div class="dot"></div>
+            </div>
+
+            <!-- КРОК 1: ЛОКАЦІЯ -->
+            <div class="step active" id="step1">
+                <div style="font-size: 54px; margin-bottom: 15px;">📍</div>
+                <h3>Де це сталося?</h3>
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 25px;">
+                    Натисніть кнопку для автоматичного визначення GPS координат
+                </p>
+                <button class="btn-action" onclick="getLocation(this)">
+                    �� Визначити локацію
+                </button>
+                <button style="background:none; border:none; color:#94a3b8; margin-top:18px; cursor:pointer; font-size: 14px; font-weight: 600;" onclick="skipLocation()">
+                    Пропустити →
+                </button>
+            </div>
+
+            <!-- КРОК 2: ОПИС (громада автоматична!) -->
+            <div class="step" id="step2">
+                <div id="locDisplay" class="location-badge" style="display:none"></div>
+                <div id="commDisplay" class="community-badge"></div>
+                
+                <h3 style="margin-bottom: 10px;">Що трапилося?</h3>
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 15px;">
+                    Опишіть ситуацію коротко
+                </p>
+                <textarea id="msg" placeholder="Наприклад: Яма на дорозі, не працює освітлення, підозріла активність..."></textarea>
+                <button class="btn-action" onclick="submitFinal()">🚨 НАДІСЛАТИ</button>
+            </div>
+
+            <!-- КРОК 3: УСПІХ -->
+            <div class="step" id="stepOk">
+                <div style="font-size: 64px; color: #10b981; margin-bottom: 10px;">✅</div>
+                <h3>Дякуємо!</h3>
+                <p style="color: #64748b; margin-bottom: 25px; line-height: 1.5;">
+                    Ваше звернення зареєстровано.<br>
+                    Менеджер безпеки розгляне його найближчим часом.
+                </p>
+                <button class="btn-action" onclick="closeForm()">Зрозуміло</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ІНІЦІАЛІЗАЦІЯ КАРТИ
+const map = L.map('map', {
+    center: [46.4825, 30.7233],
+    zoom: 11,
+    zoomControl: true
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18
+}).addTo(map);
+
+// ДАНІ
+let userCommunity = 'Не визначено';
+let report = { 
+    lat: 0, 
+    lng: 0, 
+    address: 'Локацію не визначено',
+    msg: '' 
+};
+
+// СЛУХАЄМО VELO
+window.addEventListener('message', (event) => {
+    if (event.data.type === 'LOAD_INCIDENTS') {
+        loadIncidents(event.data.data);
+    }
+    
+    if (event.data.type === 'SET_USER_COMMUNITY') {
+        userCommunity = event.data.community;
+        document.getElementById('communityName').textContent = userCommunity + ' • Цифровий моніторинг';
+        document.getElementById('commDisplay').textContent = '🏘️ Громада: ' + userCommunity;
+    }
+});
+
+// МАРКЕРИ
+function loadIncidents(data) {
+    map.eachLayer(layer => {
+        if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+            map.removeLayer(layer);
+        }
+    });
+    
+    data.forEach(inc => {
+        const color = inc.riskLevel >= 4 ? '#EF4444' : inc.riskLevel >= 3 ? '#F59E0B' : '#10B981';
+        
+        L.circleMarker([inc.latitude, inc.longitude], {
+            radius: 8,
+            fillColor: color,
+            color: 'white',
+            weight: 2,
+            fillOpacity: 0.8
+        }).addTo(map).bindPopup(`
+            <div style="padding: 8px;">
+                <h3 style="margin: 0 0 8px; font-size: 14px; font-weight: 700;">
+                    ${inc.code || 'TEMP'} — ${inc.title}
+                </h3>
+                <p style="margin: 4px 0; font-size: 12px; color: #64748B;">📍 ${inc.zone}</p>
+                <p style="margin: 4px 0; font-size: 12px; color: #64748B;">⚠️ Ризик: ${inc.riskLevel}/5</p>
+                <p style="margin: 4px 0; font-size: 12px; color: #64748B;">📅 ${new Date(inc.createdDate).toLocaleDateString('uk-UA')}</p>
+            </div>
+        `);
+    });
+    
+    document.getElementById('totalCount').textContent = data.length;
+}
+
+// ФОРМА
+function openForm() {
+    document.getElementById('formOverlay').classList.add('open');
+}
+
+function closeForm() {
+    document.getElementById('formOverlay').classList.remove('open');
+    setTimeout(resetToStart, 300);
+}
+
+function goStep(n) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    const targetStep = n > 2 ? 'stepOk' : 'step' + n;
+    document.getElementById(targetStep).classList.add('active');
+    
+    const dots = document.querySelectorAll('.dot');
+    dots.forEach((dot, idx) => {
+        if(idx < n) dot.classList.add('active');
+        else dot.classList.remove('active');
+    });
+}
+
+function getLocation(btn) {
+    btn.textContent = '⏳ Визначаємо GPS...';
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        (p) => {
+            report.lat = p.coords.latitude;
+            report.lng = p.coords.longitude;
+            report.address = report.lat.toFixed(6) + ", " + report.lng.toFixed(6);
+            
+            const badge = document.getElementById('locDisplay');
+            badge.textContent = '📍 ' + report.address;
+            badge.style.display = 'block';
+            
+            goStep(2);
+        },
+        (err) => {
+            console.warn("GPS Error:", err.message);
+            report.address = 'Локацію не визначено';
+            goStep(2);
+        },
+        { timeout: 6000, enableHighAccuracy: true }
+    );
+}
+
+function skipLocation() {
+    report.lat = 0;
+    report.lng = 0;
+    report.address = 'Локацію не визначено';
+    goStep(2);
+}
+
+function submitFinal() {
+    report.msg = document.getElementById('msg').value;
+    
+    if (!report.msg || report.msg.trim().length < 10) {
+        alert('Будь ласка, опишіть ситуацію детальніше (мінімум 10 символів)');
+        return;
+    }
+    
+    // ВІДПРАВКА У VELO (громада автоматична!)
+    window.parent.postMessage({
+        type: 'SUBMIT_REPORT',
+        data: {
+            title: report.msg,
+            lat: report.lat,
+            lng: report.lng,
+            address: report.address
+            // zone буде додано в Velo автоматично!
+        }
+    }, '*');
+    
+    goStep(3);
+}
+
+function resetToStart() {
+    report = { lat: 0, lng: 0, address: 'Локацію не визначено', msg: '' };
+    document.getElementById('msg').value = '';
+    document.getElementById('locDisplay').style.display = 'none';
+    goStep(1);
+    const btn = document.querySelector('#step1 .btn-action');
+    btn.textContent = '📍 Визначити локацію';
+    btn.disabled = false;
+}
+
+// ЗАПИТ ДАНИХ
+window.parent.postMessage({ type: 'GET_INCIDENTS' }, '*');
+window.parent.postMessage({ type: 'GET_USER_COMMUNITY' }, '*');
+</script>
+</body>
+</html>
