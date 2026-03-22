@@ -1,112 +1,38 @@
 /**
- * Backend module для завантаження фото в Wix Media Manager
- * SafeCity Platform v1.2
+ * Backend module для завантаження фото
+ * SafeCity Platform v1.2 - Simplified Version
  * @file backend/photo-upload.jsw
  */
 
-import { mediaManager } from 'wix-media-backend';
-
-/**
- * Завантажує base64 фото в Wix Media Manager
- * @param {string} base64Data - Data URL (data:image/jpeg;base64,...)
- * @param {string} community - Назва громади
- * @returns {Promise<string|null>} - URL фото або null
- */
-export async function uploadIncidentPhoto(base64Data, community) {
-    console.log('📸 Backend: Початок завантаження фото');
-    console.log('🏘️ Громада:', community);
-    
-    try {
-        // Перевірка формату
-        if (!base64Data || !base64Data.startsWith('data:image')) {
-            console.error('❌ Невірний формат фото');
-            return null;
-        }
-        
-        // Витягуємо MIME type і extension
-        const mimeMatch = base64Data.match(/data:image\/(.*?);base64/);
-        const mimeType = mimeMatch ? `image/${mimeMatch[1]}` : 'image/jpeg';
-        const extension = mimeMatch ? mimeMatch[1] : 'jpg';
-        
-        console.log('📋 MIME type:', mimeType);
-        console.log('📋 Extension:', extension);
-        
-        // Конвертуємо base64 → Buffer
-        const base64WithoutPrefix = base64Data.split(',')[1];
-        const imageBuffer = Buffer.from(base64WithoutPrefix, 'base64');
-        
-        console.log('📦 Розмір:', imageBuffer.length, 'bytes');
-        console.log('📦 Розмір MB:', (imageBuffer.length / 1024 / 1024).toFixed(2));
-        
-        // Генеруємо унікальне ім'я файлу
-        const timestamp = Date.now();
-        const randomId = Math.random().toString(36).substring(2, 8);
-        const fileName = `incident_${timestamp}_${randomId}.${extension}`;
-        
-        // Шлях в Media Manager
-        const uploadPath = `incidents/${community}/${fileName}`;
-        
-        console.log('📁 Шлях завантаження:', uploadPath);
-        console.log('💾 Завантаження в Wix Media Manager...');
-        
-        // Завантажуємо в Media Manager
-        const uploadResult = await mediaManager.upload(
-            uploadPath,
-            imageBuffer,
-            fileName,
-            {
-                "mediaOptions": {
-                    "mimeType": mimeType,
-                    "mediaType": "image"
-                },
-                "metadataOptions": {
-                    "isPrivate": false,
-                    "isVisitorUpload": false,
-                    "context": {
-                        "community": community,
-                        "uploadedAt": new Date().toISOString(),
-                        "source": "incident_report"
-                    }
-                }
-            }
-        );
-        
-        console.log('✅✅✅ ФОТО ЗАВАНТАЖЕНО УСПІШНО!');
-        console.log('🔗 URL:', uploadResult.fileUrl);
-        console.log('📊 File Info:', uploadResult);
-        
-        return uploadResult.fileUrl;
-        
-    } catch (err) {
-        console.error('❌❌❌ ПОМИЛКА ЗАВАНТАЖЕННЯ ФОТО!');
-        console.error('Повідомлення:', err.message);
-        console.error('Stack:', err.stack);
-        console.error('Повний об\'єкт помилки:', JSON.stringify(err, null, 2));
-        return null;
-    }
+export function getPhotoUploadConfig() {
+    return {
+        maxSizeMB: 5,
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        uploadPath: 'incidents'
+    };
 }
 
-/**
- * Перевіряє розмір фото і стискає якщо потрібно
- * @param {string} base64Data - Data URL
- * @param {number} maxSizeMB - Максимальний розмір (1 для Free, 5 для Premium)
- * @returns {Promise<string>} - Стиснуте фото або оригінал
- */
-export async function compressPhotoIfNeeded(base64Data, maxSizeMB = 1) {
-    const base64WithoutPrefix = base64Data.split(',')[1];
-    const sizeBytes = base64WithoutPrefix.length * 0.75; // base64 -> bytes
-    const sizeMB = sizeBytes / 1024 / 1024;
+export function validatePhoto(base64Data) {
+    console.log('📸 Валідація фото...');
     
-    console.log(`📊 Розмір фото: ${sizeMB.toFixed(2)} MB`);
-    console.log(`📊 Ліміт: ${maxSizeMB} MB`);
-    
-    if (sizeMB <= maxSizeMB) {
-        console.log('✅ Фото в межах ліміту, стиснення не потрібне');
-        return base64Data;
+    if (!base64Data || !base64Data.startsWith('data:image')) {
+        console.error('❌ Невірний формат фото');
+        return { valid: false, error: 'Invalid format' };
     }
     
-    console.log('⚠️ Фото перевищує ліміт, потрібне стиснення');
-    // TODO: додати логіку стиснення в майбутньому
-    // Поки що просто повертаємо оригінал
-    return base64Data;
+    const mimeMatch = base64Data.match(/data:image\/(.*?);base64/);
+    const mimeType = mimeMatch ? `image/${mimeMatch[1]}` : 'image/jpeg';
+    
+    const base64WithoutPrefix = base64Data.split(',')[1];
+    const sizeBytes = base64WithoutPrefix.length * 0.75;
+    const sizeMB = sizeBytes / 1024 / 1024;
+    
+    console.log(`📊 Розмір: ${sizeMB.toFixed(2)} MB`);
+    console.log(`📊 MIME: ${mimeType}`);
+    
+    if (sizeMB > 5) {
+        return { valid: false, error: 'File too large' };
+    }
+    
+    return { valid: true, mimeType, sizeMB };
 }

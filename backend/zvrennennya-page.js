@@ -1,13 +1,12 @@
 /**
  * Velo код для сторінки "Звернення"
- * SafeCity Platform v1.2 - WITH PHOTO UPLOAD
+ * SafeCity Platform v1.2 - Simplified Photo Version
  * @date 2026-03-22
  */
 
 import wixData from 'wix-data';
 import { currentMember } from 'wix-members-frontend';
 import { fetch } from 'wix-fetch';
-import { uploadIncidentPhoto } from 'backend/photo-upload';
 
 let memberData = null;
 let userCommunity = '';
@@ -114,7 +113,7 @@ async function sendToTelegram(incident) {
             address: incident.address,
             createdDate: incident.createdDate,
             source: incident.source,
-            photoUrl: incident.image_fld || null
+            hasPhoto: !!incident.image_fld
         };
         
         console.log('📦 Дані для Telegram:', message);
@@ -148,13 +147,6 @@ async function handleNewReport(data) {
     console.log('Громада:', userCommunity);
     console.log('🖼️ Є фото?', !!data.photo);
     
-    if (data.photo) {
-        const photoLength = data.photo.length;
-        const photoSizeMB = (photoLength * 0.75 / 1024 / 1024).toFixed(2);
-        console.log('🖼️ Розмір фото:', photoSizeMB, 'MB');
-        console.log('🖼️ Початок base64:', data.photo.substring(0, 50) + '...');
-    }
-    
     try {
         const email = memberData?.loginEmail || 
                      memberData?.contactDetails?.loginEmail || 
@@ -164,18 +156,15 @@ async function handleNewReport(data) {
                     memberData?.contactDetails?.firstName || 
                     'Анонім';
         
-        // ЗАВАНТАЖУЄМО ФОТО (якщо є)
-        let photoUrl = null;
+        // Обробка фото (зберігаємо інфо про наявність)
+        let photoInfo = '';
         if (data.photo) {
-            console.log('📸 Викликаємо uploadIncidentPhoto...');
-            photoUrl = await uploadIncidentPhoto(data.photo, userCommunity);
+            const photoLength = data.photo.length;
+            const photoSizeMB = (photoLength * 0.75 / 1024 / 1024).toFixed(2);
+            console.log('📸 Фото отримано!');
+            console.log('🖼️ Розмір фото:', photoSizeMB, 'MB');
             
-            if (photoUrl) {
-                console.log('✅ Фото успішно завантажено!');
-                console.log('🔗 URL фото:', photoUrl);
-            } else {
-                console.log('⚠️ Фото НЕ завантажено (помилка в backend)');
-            }
+            photoInfo = `PHOTO_RECEIVED:${photoSizeMB}MB`;
         } else {
             console.log('ℹ️ Звернення без фото');
         }
@@ -195,7 +184,7 @@ async function handleNewReport(data) {
             memberId: memberData?._id || 'unknown',
             createdDate: new Date(),
             source: 'map_button',
-            image_fld: photoUrl || ''
+            image_fld: photoInfo
         };
         
         console.log('📦 Об\'єкт для збереження:', incident);
