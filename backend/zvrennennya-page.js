@@ -1,12 +1,13 @@
 /**
  * Velo код для сторінки "Звернення"
- * SafeCity Platform v1.1.0
- * @date 2026-03-21
+ * SafeCity Platform v1.2 - WITH PHOTO UPLOAD
+ * @date 2026-03-22
  */
 
 import wixData from 'wix-data';
 import { currentMember } from 'wix-members-frontend';
 import { fetch } from 'wix-fetch';
+import { uploadIncidentPhoto } from 'backend/photo-upload';
 
 let memberData = null;
 let userCommunity = '';
@@ -112,7 +113,8 @@ async function sendToTelegram(incident) {
             longitude: incident.longitude,
             address: incident.address,
             createdDate: incident.createdDate,
-            source: incident.source
+            source: incident.source,
+            photoUrl: incident.image_fld || null
         };
         
         console.log('📦 Дані для Telegram:', message);
@@ -141,8 +143,17 @@ async function sendToTelegram(incident) {
 
 async function handleNewReport(data) {
     console.log('🔔 === СТВОРЕННЯ ЗВЕРНЕННЯ ===');
+    console.log('📦 Дані від форми:', data);
     console.log('Назва:', data.title);
     console.log('Громада:', userCommunity);
+    console.log('🖼️ Є фото?', !!data.photo);
+    
+    if (data.photo) {
+        const photoLength = data.photo.length;
+        const photoSizeMB = (photoLength * 0.75 / 1024 / 1024).toFixed(2);
+        console.log('🖼️ Розмір фото:', photoSizeMB, 'MB');
+        console.log('🖼️ Початок base64:', data.photo.substring(0, 50) + '...');
+    }
     
     try {
         const email = memberData?.loginEmail || 
@@ -152,6 +163,22 @@ async function handleNewReport(data) {
         const name = memberData?.profile?.nickname || 
                     memberData?.contactDetails?.firstName || 
                     'Анонім';
+        
+        // ЗАВАНТАЖУЄМО ФОТО (якщо є)
+        let photoUrl = null;
+        if (data.photo) {
+            console.log('📸 Викликаємо uploadIncidentPhoto...');
+            photoUrl = await uploadIncidentPhoto(data.photo, userCommunity);
+            
+            if (photoUrl) {
+                console.log('✅ Фото успішно завантажено!');
+                console.log('🔗 URL фото:', photoUrl);
+            } else {
+                console.log('⚠️ Фото НЕ завантажено (помилка в backend)');
+            }
+        } else {
+            console.log('ℹ️ Звернення без фото');
+        }
         
         const incident = {
             title: data.title || 'Без назви',
@@ -167,23 +194,28 @@ async function handleNewReport(data) {
             authorName: name,
             memberId: memberData?._id || 'unknown',
             createdDate: new Date(),
-            source: 'map_button'
+            source: 'map_button',
+            image_fld: photoUrl || ''
         };
         
         console.log('📦 Об\'єкт для збереження:', incident);
-        console.log('💾 Зберігаємо в Incidents...');
+        console.log('💾 Зберігаємо в Collection Incidents...');
         
         const saved = await wixData.insert("Incidents", incident);
         
-        console.log('✅✅✅ ЗБЕРЕЖЕНО! ID:', saved._id);
-        console.log('Повний об\'єкт:', saved);
+        console.log('✅✅✅ ЗБЕРЕЖЕНО В COLLECTION! ID:', saved._id);
+        console.log('📊 Повний об\'єкт:', saved);
         
+        console.log('📱 Відправка в Telegram...');
         await sendToTelegram(saved);
         
+        console.log('🗺️ Оновлюємо карту...');
         await loadCommunityIncidents();
         
+        console.log('🎉 ВСЕ ГОТОВО!');
+        
     } catch (err) {
-        console.error('❌ ПОМИЛКА:', err.message);
+        console.error('❌ КРИТИЧНА ПОМИЛКА:', err.message);
         console.error('Stack:', err.stack);
     }
 }
